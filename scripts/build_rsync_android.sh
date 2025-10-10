@@ -83,6 +83,11 @@ export CPPFLAGS="-D__ANDROID_API__=${ANDROID_API_LEVEL}"
   --build=$(./config.guess) \
   --with-included-zlib=yes \
   --with-included-popt=yes \
+  --disable-md2man \
+  --disable-openssl \
+  --disable-xxhash \
+  --disable-zstd \
+  --disable-lz4 \
   --disable-iconv \
   --disable-debug \
   --disable-locale \
