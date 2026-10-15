@@ -12,6 +12,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.preference.PreferenceManager;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import androidx.annotation.NonNull;
@@ -76,9 +77,7 @@ public class MainActivity extends AppCompatActivity {
         ensureLogFileExists(debug_log, "MainActivity", "Unable to create debug log file");
 
         UiSafety.runOnUiThreadIfAlive(this, () -> {
-            if (Build.VERSION.SDK_INT >= 23 && !checkPermission()) {
-                requestPermission();
-            }
+            requestPermission();
 
             ViewPager viewPager = findViewById(R.id.pager);
             ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
@@ -488,35 +487,50 @@ public class MainActivity extends AppCompatActivity {
         return "com.google.android.apps.photos.content".equals(uri.getAuthority());
     }
 
-    private boolean checkPermission() {
-        int result = ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        return result == PackageManager.PERMISSION_GRANTED;
+    private void requestPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return;
+        }
+        List<String> missing = new ArrayList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            addMissingPermission(missing, android.Manifest.permission.READ_MEDIA_IMAGES);
+            addMissingPermission(missing, android.Manifest.permission.READ_MEDIA_VIDEO);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                addMissingPermission(missing, android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED);
+            }
+            if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("notifications", true)) {
+                addMissingPermission(missing, android.Manifest.permission.POST_NOTIFICATIONS);
+            }
+        } else {
+            addMissingPermission(missing, android.Manifest.permission.READ_EXTERNAL_STORAGE);
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                addMissingPermission(missing, android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
+            }
+        }
+        if (!missing.isEmpty()) {
+            SharedPreferences.Editor requested = getSharedPreferences("PermissionRequests", MODE_PRIVATE).edit();
+            for (String permission : missing) requested.putBoolean(permission, true);
+            requested.apply();
+            ActivityCompat.requestPermissions(this, missing.toArray(new String[0]), PERMISSION_REQUEST_CODE);
+        }
     }
 
-    private void requestPermission() {
-        UiSafety.runOnUiThreadIfAlive(this, () -> {
-            if (UiSafety.isUiDead(this)) {
-                return;
-            }
-            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                Toast.makeText(MainActivity.this, "Write External Storage permission allows to export logfile to your external storage. Please allow this permission in App Settings.", Toast.LENGTH_LONG).show();
-            } else {
-                ActivityCompat.requestPermissions(MainActivity.this, new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
-            }
-        });
+    private void addMissingPermission(List<String> missing, String permission) {
+        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED
+                && !getSharedPreferences("PermissionRequests", MODE_PRIVATE).getBoolean(permission, false)) {
+            missing.add(permission);
+        }
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String permissions[], @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        switch (requestCode) {
-            case PERMISSION_REQUEST_CODE:
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Log.e("value", "Permission Granted, Now you can use local drive .");
-                } else {
-                    Log.e("value", "Permission Denied, You cannot use local drive .");
-                }
-                break;
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            for (int index = 0; index < permissions.length; index++) {
+                boolean granted = index < grantResults.length
+                        && grantResults[index] == PackageManager.PERMISSION_GRANTED;
+                Log.i("MainActivity", permissions[index] + (granted ? " granted" : " denied"));
+            }
         }
     }
 

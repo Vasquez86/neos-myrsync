@@ -148,4 +148,6 @@
         This is a potentially dangerous feature that may result in data loss. Take caution when using options that delete files.
     </string>
 
+    <string name="folder_permission_not_persistent">This folder provider did not grant lasting access. You may need to select the folder again.</string>
+    <string name="folder_requires_local_path">Rsync requires a folder on local device storage. This provider does not expose a usable local path.</string>
 </resources>

@@ -39,6 +39,7 @@ import static com.linminitools.myrsync.MainActivity.getPath;
 
 public class addConfig extends AppCompatActivity {
     boolean path_is_not_writable;
+    protected String selectedTreeUri = "";
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -75,24 +76,48 @@ public class addConfig extends AppCompatActivity {
 
     public void addPath(View v){
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-        i.setFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        i.setFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        i.setFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
         Intent chooser = Intent.createChooser(i,"Choose Directory");
         startActivityForResult(chooser,1);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
         // Check which request it is that we're responding to
         if (requestCode == 1) {
             // Make sure the request was successful
-            if (resultCode == RESULT_OK) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
                 // Get the URI that points to the selected path
 
                 Uri pathUri = data.getData();
+                boolean readGranted = (data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0;
+                boolean writeGranted = (data.getFlags() & Intent.FLAG_GRANT_WRITE_URI_PERMISSION) != 0;
+                try {
+                    if (readGranted && writeGranted) {
+                        getContentResolver().takePersistableUriPermission(pathUri,
+                                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    } else if (readGranted) {
+                        getContentResolver().takePersistableUriPermission(pathUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } else if (writeGranted) {
+                        getContentResolver().takePersistableUriPermission(pathUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                    } else {
+                        throw new SecurityException("Provider returned no folder access flags");
+                    }
+                } catch (SecurityException error) {
+                    Log.w("addConfig", "Provider did not grant persistent folder access", error);
+                    Toast.makeText(this, R.string.folder_permission_not_persistent, Toast.LENGTH_LONG).show();
+                }
+                selectedTreeUri = pathUri.toString();
                 Uri dirUri = DocumentsContract.buildDocumentUriUsingTree(pathUri, DocumentsContract.getTreeDocumentId(pathUri));
                 String local_path = getPath(appContext, dirUri);
+                if (local_path == null || local_path.isEmpty()) {
+                    Toast.makeText(this, R.string.folder_requires_local_path, Toast.LENGTH_LONG).show();
+                    return;
+                }
                 File dir = new File(local_path);
                 DocumentFile df = DocumentFile.fromTreeUri(appContext, dirUri);
 
@@ -118,7 +143,7 @@ public class addConfig extends AppCompatActivity {
                     SharedPreferences path_prefs = appContext.getSharedPreferences("Rsync_Config_path", MODE_PRIVATE);
                     SharedPreferences.Editor path_prefseditor = path_prefs.edit();
                     path_prefseditor.putString("local_path", local_path);
-                    path_prefseditor.putString("path_uri", dirUri.toString());
+                    path_prefseditor.putString("path_uri", selectedTreeUri);
                     path_prefseditor.commit();
 
                     TextView tv_path = findViewById(R.id.ed_path);
@@ -197,7 +222,7 @@ public class addConfig extends AppCompatActivity {
         String rs_mode = String.valueOf(rb.getText()).trim();
         //String local_path=appContext.getSharedPreferences("Rsync_Config_path", MODE_PRIVATE).getString("local_path","");
         String local_path=String.valueOf(ed_path.getText());
-        String path_uri = appContext.getSharedPreferences("Rsync_Config_path", MODE_PRIVATE).getString("path_uri","");
+        String path_uri = selectedTreeUri;
         if (rs_port.isEmpty()) { rs_port="873";}
 
         configMap.put("rs_ip",rs_ip);
@@ -273,7 +298,7 @@ public class addConfig extends AppCompatActivity {
             config.local_path = local_path;
             config.name= rs_name;
             config.rs_mode=rs_mode;
-            //config.path_uri = path_uri;
+            config.path_uri = path_uri;
             config.adv_options = adv_options;
             config.saveToDisk();
             configs.add(config);
