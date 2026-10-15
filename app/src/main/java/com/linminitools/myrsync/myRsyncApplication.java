@@ -63,6 +63,7 @@ public class myRsyncApplication extends Application {
                 config.rs_options = config_prefs.getString("rs_options_"+id,"");
                 config.rs_module = config_prefs.getString("rs_module_"+id, "");
                 config.local_path = config_prefs.getString("local_path_"+id, "");
+                config.path_uri = config_prefs.getString("path_uri_"+id, "");
                 config.name = config_prefs.getString("rs_name_"+id, "");
                 config.addedOn = config_prefs.getLong("rs_addedon_"+id,0);
                 config.rs_mode = config_prefs.getString("rs_mode_"+id,"Push");

@@ -63,6 +63,7 @@ public class RS_Configuration extends MainActivity implements Comparable<RS_Conf
     private static final String TAG = "RS_Configuration";
 
     String rs_ip, rs_user, rs_module, rs_options, local_path, name, rs_mode, adv_options;
+    String path_uri = "";
     Long addedOn;
     String rs_port="873";
     final int id;
@@ -95,7 +96,7 @@ public class RS_Configuration extends MainActivity implements Comparable<RS_Conf
         prefseditor.putString("local_path_"+String.valueOf(this.id),local_path);
         prefseditor.putString("last_result_"+String.valueOf(this.id),"Never Run");
         prefseditor.putString("last_run_"+String.valueOf(this.id),"Never Run");
-        //prefseditor.putString("path_uri_"+String.valueOf(this.id),this.path_uri);
+        prefseditor.putString("path_uri_"+String.valueOf(this.id),this.path_uri);
         prefseditor.putString("rs_adv_options_"+String.valueOf(this.id),this.adv_options);
         prefseditor.putLong("rs_addedon_"+String.valueOf(this.id),addedOn);
 
@@ -133,7 +134,7 @@ public class RS_Configuration extends MainActivity implements Comparable<RS_Conf
         prefseditor.remove("last_result_"+String.valueOf(this.id));
         prefseditor.remove("last_run_"+String.valueOf(this.id));
         prefseditor.remove("rs_addedon_"+String.valueOf(this.id));
-        //prefseditor.remove("path_uri_"+String.valueOf(this.id));
+        prefseditor.remove("path_uri_"+String.valueOf(this.id));
         prefseditor.remove("rs_adv_options_"+String.valueOf(this.id));
         prefseditor.apply();
 
@@ -279,6 +280,10 @@ public class RS_Configuration extends MainActivity implements Comparable<RS_Conf
                                 }
 
                                 MainActivity.appendDebugLog(formatter, "RSYNC COMMAND LINE: " + commandLine);
+                                MainActivity.appendRsyncLog(formatter, "RSYNC COMMAND LINE: " + commandLine);
+                                if (mode.equals("Push")) {
+                                    logSourceVisibility(context, formatter, new File(local_path));
+                                }
                                 Log.i(TAG, "Executing command: " + commandLine);
                                 java.util.List<String> arguments = new java.util.ArrayList<>();
                                 arguments.add("rsync");
@@ -372,6 +377,37 @@ public class RS_Configuration extends MainActivity implements Comparable<RS_Conf
             MainActivity.appendRsyncLog(outerFormatter, message);
             Log.e(TAG, "Unexpected failure while preparing configuration execution for '" + name + "'", generalError);
             update_result(context, "Failed", schedulerKey);
+        }
+    }
+
+    private static void logSourceVisibility(Context context, SimpleDateFormat formatter, File source) {
+        File[] entries = source.listFiles();
+        if (entries == null) {
+            MainActivity.appendRsyncLog(formatter,
+                    "SOURCE WARNING: cannot list source folder. Check the path and storage permissions.");
+            return;
+        }
+        int files = 0;
+        int directories = 0;
+        for (File entry : entries) {
+            if (entry.isFile()) files++;
+            else if (entry.isDirectory()) directories++;
+        }
+        MainActivity.appendRsyncLog(formatter, "SOURCE VISIBILITY: " + files
+                + " files and " + directories + " folders directly visible (not a recursive count).");
+        if (entries.length == 0) {
+            MainActivity.appendRsyncLog(formatter,
+                    "SOURCE WARNING: folder appears empty to this app. It may be empty or Android may be hiding files.");
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && (ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_MEDIA_IMAGES)
+                    != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_MEDIA_VIDEO)
+                    != PackageManager.PERMISSION_GRANTED)) {
+            MainActivity.appendRsyncLog(formatter,
+                    "MEDIA ACCESS WARNING: full photo/video access is not granted. "
+                    + "On Android 14+, only selected media may be visible. "
+                    + "For a complete Camera backup, allow all photos and videos in app permissions.");
         }
     }
 

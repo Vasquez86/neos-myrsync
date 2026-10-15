@@ -38,6 +38,7 @@ public class editConfig extends addConfig {
         final int p = i.getIntExtra("pos", 0);
         final RS_Configuration config = configs.get(p);
         final int id = config.id;
+        selectedTreeUri = config.path_uri;
 
         UiSafety.runOnUiThreadIfAlive(this, () -> {
             Button save = findViewById(R.id.bt_save);
@@ -151,7 +152,7 @@ public class editConfig extends addConfig {
                     c.local_path = configMap.get("local_path");
                     c.name = configMap.get("rs_name");
                     c.rs_mode = configMap.get("rs_mode");
-                    //c.path_uri = configMap.get("path_uri");
+                    c.path_uri = configMap.get("path_uri");
                     c.adv_options = configMap.get("adv_options");
                     if (request==1) {
                         c.saveToDisk();
